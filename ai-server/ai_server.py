@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
+"""
+Gopang FastAPI AI Server with OpenHash Integration
+"""
 import aiohttp
 import sqlite3
+import sys
+sys.path.append('/home/ec2-user/gopang')
+
+from datetime import datetime
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
+from openhash.hash_generator import create_hash_record, get_hash_statistics
 
 app = FastAPI(title="Gopang AI Server")
 
@@ -23,6 +31,7 @@ DB_PATH = "/home/ec2-user/gopang/database/gopang.db"
 class ChatRequest(BaseModel):
     user_id: str
     message: str
+    target_user: Optional[str] = None  # 대화 상대 지정
     ai_type: str = "personal"
 
 class ChatResponse(BaseModel):
@@ -30,11 +39,19 @@ class ChatResponse(BaseModel):
     ai_type: str
     model_used: str
     conv_id: Optional[int] = None
+    hash_info: Optional[dict] = None
 
 class User(BaseModel):
     user_id: str
     user_type: str
     name: str
+    region_code: Optional[str] = '5011025000'
+
+class UserInfo(BaseModel):
+    user_id: str
+    name: str
+    user_type: str
+    is_online: bool
 
 class ConversationHistory(BaseModel):
     conv_id: int
@@ -83,7 +100,6 @@ async def call_llama_server(url: str, prompt: str, max_tokens: int = 100) -> str
                 data = await response.json()
                 content = data.get("content", "").strip()
                 
-                # 불필요한 프롬프트 반복 제거
                 if "사용자:" in content:
                     content = content.split("사용자:")[0].strip()
                 if "AI:" in content:
@@ -102,21 +118,69 @@ async def root():
         "models": {
             "personal": "Qwen2.5-0.5B",
             "institution": "Qwen2.5-3B"
-        }
+        },
+        "openhash": "enabled"
     }
 
 @app.get("/health")
 async def health():
     return {"status": "healthy"}
 
+@app.get("/users/list", response_model=List[UserInfo])
+async def list_users():
+    """모든 사용자 목록 조회 (사람 + AI)"""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # 사람 사용자
+        cursor.execute("""
+            SELECT user_id, name, user_type, 1 as is_online
+            FROM users
+            WHERE user_type = 'personal'
+        """)
+        humans = cursor.fetchall()
+        
+        # AI 사용자
+        cursor.execute("""
+            SELECT ai_id as user_id, ai_name as name, ai_type as user_type, 1 as is_online
+            FROM ai_users
+            WHERE ai_type = 'institution'
+        """)
+        ai_users = cursor.fetchall()
+        
+        conn.close()
+        
+        result = []
+        for row in humans:
+            result.append(UserInfo(
+                user_id=row["user_id"],
+                name=row["name"],
+                user_type="사람",
+                is_online=True
+            ))
+        
+        for row in ai_users:
+            result.append(UserInfo(
+                user_id=row["user_id"],
+                name=row["name"],
+                user_type="기관",
+                is_online=True
+            ))
+        
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     try:
-        if request.ai_type == "personal":
+        # 대화 상대가 지정되지 않으면 개인 AI 사용
+        if not request.target_user:
             server_url = LLAMA_SERVER_0_5B
             model_name = "Qwen2.5-0.5B"
             max_tokens = 80
-            # 간결하고 자연스러운 프롬프트
             prompt = f"""너는 친근한 개인 비서야. 한국어로만 대화해.
 
 규칙:
@@ -128,21 +192,28 @@ async def chat(request: ChatRequest):
 사용자: {request.message}
 AI:"""
         else:
+            # 대화 상대가 AI 기관이면 Qwen 3B 사용
             server_url = LLAMA_SERVER_3B
             model_name = "Qwen2.5-3B"
             max_tokens = 120
-            prompt = f"""당신은 정부 기관 AI입니다. 한국어로만 답변하세요.
-
-규칙:
-- 정확하고 공식적인 어조
-- 2-3 문장으로 간결하게
-- 존댓말 사용
+            
+            # AI 사용자의 system prompt 가져오기
+            conn = get_db()
+            cursor = conn.cursor()
+            cursor.execute("SELECT system_prompt FROM ai_users WHERE ai_id = ?", (request.target_user,))
+            row = cursor.fetchone()
+            conn.close()
+            
+            system_prompt = row["system_prompt"] if row else "당신은 한국 정부 기관 AI입니다. 한국어로만 답변하세요."
+            
+            prompt = f"""{system_prompt}
 
 사용자: {request.message}
 AI:"""
         
         ai_response = await call_llama_server(server_url, prompt, max_tokens)
         
+        # 대화 기록 저장
         conv_id = save_conversation(
             user_id=request.user_id,
             message=request.message,
@@ -150,11 +221,26 @@ AI:"""
             ai_type=request.ai_type
         )
         
+        # OpenHash 레코드 생성
+        conversation_content = f"{request.message}\n{ai_response}"
+        hash_id, layer, target_ai = create_hash_record(
+            user_id=request.user_id,
+            content=conversation_content,
+            content_type='conversation'
+        )
+        
+        hash_info = {
+            "hash_id": hash_id,
+            "layer": layer,
+            "target_ai": target_ai
+        }
+        
         return ChatResponse(
             response=ai_response,
             ai_type=request.ai_type,
             model_used=model_name,
-            conv_id=conv_id
+            conv_id=conv_id,
+            hash_info=hash_info
         )
         
     except Exception as e:
@@ -192,17 +278,27 @@ async def get_history(user_id: str, limit: int = 10):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/openhash/stats")
+async def openhash_stats():
+    """OpenHash 통계 조회"""
+    try:
+        stats = get_hash_statistics()
+        return stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/users", response_model=User)
 async def create_user(user: User):
     try:
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO users (user_id, user_type, name) VALUES (?, ?, ?)",
-            (user.user_id, user.user_type, user.name)
+            "INSERT INTO users (user_id, user_type, name, region_code) VALUES (?, ?, ?, ?)",
+            (user.user_id, user.user_type, user.name, user.region_code)
         )
         conn.commit()
         conn.close()
+        
         return user
     except:
         return user

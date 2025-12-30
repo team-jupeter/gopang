@@ -1473,3 +1473,416 @@ JavaScript: 4KB + 62KB (socket.io)
 **버전:** 1.1.0  
 **새로 추가된 섹션:** 프론트엔드 개발 (23-30단계)
 
+
+---
+
+## 🔗 OpenHash 시스템 구현 (추가 작업 - 단계 35-41)
+
+### 35단계: OpenHash 데이터베이스 스키마 생성
+
+**작업일:** 2025-12-30
+
+OpenHash 명세서에 따라 분산 저장 시스템의 데이터베이스 구조 구축
+
+**생성된 테이블:**
+
+1. **ai_users** - AI 사용자 정보
+```sql
+   CREATE TABLE ai_users (
+       ai_id TEXT PRIMARY KEY,
+       ai_name TEXT NOT NULL,
+       ai_type TEXT NOT NULL,
+       system_prompt TEXT NOT NULL,
+       owner_id TEXT,
+       region_code TEXT,
+       layer INTEGER,
+       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+   )
+```
+   
+2. **openhash_records** - 해시 레코드
+```sql
+   CREATE TABLE openhash_records (
+       hash_id TEXT PRIMARY KEY,
+       user_id TEXT NOT NULL,
+       content_type TEXT NOT NULL,
+       content_hash TEXT NOT NULL,
+       layer INTEGER NOT NULL,
+       transmitted BOOLEAN DEFAULT FALSE,
+       transmitted_at TIMESTAMP,
+       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+   )
+```
+
+3. **layer_storage** - 계층별 저장소
+```sql
+   CREATE TABLE layer_storage (
+       storage_id INTEGER PRIMARY KEY AUTOINCREMENT,
+       hash_id TEXT NOT NULL,
+       layer INTEGER NOT NULL,
+       ai_id TEXT NOT NULL,
+       stored_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+   )
+```
+
+**초기 데이터:**
+- AI 사용자 12개 등록
+  - Layer 4: 국세청, 건강보험공단, 법원, 특허청
+  - Layer 3: 제주특별자치도청
+  - Layer 2: 제주시청, 서귀포시청, 제주대학교병원
+  - Layer 1: 한림읍, 노형동, 중앙동, 안덕면 행정복지센터
+
+**실행:**
+```bash
+python3 database/create_openhash_tables.py
+```
+
+---
+
+### 36단계: OpenHash 핵심 로직 구현
+
+**파일:** `/home/ec2-user/gopang/openhash/hash_generator.py`
+
+**구현된 기능:**
+
+1. **해시 생성**
+```python
+   def generate_hash(content: str) -> str:
+       return hashlib.sha256(content.encode('utf-8')).hexdigest()
+```
+
+2. **확률적 계층 선택**
+```python
+   def select_layer_probabilistic(hash_value: str) -> int:
+       last_byte = int(hash_value[-2:], 16)
+       # Layer 0: 60% (0-152)
+       # Layer 1: 20% (153-203)
+       # Layer 2: 10% (204-229)
+       # Layer 3: 7% (230-247)
+       # Layer 4: 3% (248-255)
+```
+
+3. **타겟 AI 결정**
+```python
+   def get_target_ai(layer: int, region_code: str) -> str:
+       # Layer와 지역 코드에 따라 담당 AI 결정
+       # Layer 1: 읍면동 AI
+       # Layer 2: 시군구 AI
+       # Layer 3: 광역시도 AI
+       # Layer 4: 국가 AI (라운드 로빈)
+```
+
+4. **해시 레코드 생성**
+```python
+   def create_hash_record(user_id, content, content_type):
+       # 1. 해시 생성
+       # 2. 확률적 Layer 선택
+       # 3. 타겟 AI 결정
+       # 4. openhash_records 저장
+       # 5. layer_storage 저장 (Layer > 0)
+       return (hash_id, layer, target_ai)
+```
+
+**테스트 결과:**
+```
+Hash ID: hash_20251230115539_2c503beb
+Layer: 1
+Target AI: ai_06 (한림읍행정복지센터)
+```
+
+---
+
+### 37단계: users 테이블 확장
+
+**문제:** users 테이블에 `region_code` 컬럼 누락
+
+**해결:**
+```sql
+ALTER TABLE users ADD COLUMN region_code TEXT DEFAULT '5011025000'
+```
+
+**기본값:** '5011025000' (한림읍)
+
+---
+
+### 38단계: FastAPI OpenHash 통합
+
+**파일:** `/home/ec2-user/gopang/ai-server/ai_server.py`
+
+**주요 변경사항:**
+
+1. **OpenHash 모듈 임포트**
+```python
+   from openhash.hash_generator import create_hash_record, get_hash_statistics
+```
+
+2. **대화 저장 시 자동 해시 생성**
+```python
+   # 대화 기록 저장
+   conv_id = save_conversation(...)
+   
+   # OpenHash 레코드 생성
+   conversation_content = f"{request.message}\n{ai_response}"
+   hash_id, layer, target_ai = create_hash_record(
+       user_id=request.user_id,
+       content=conversation_content,
+       content_type='conversation'
+   )
+   
+   # 응답에 해시 정보 포함
+   hash_info = {
+       "hash_id": hash_id,
+       "layer": layer,
+       "target_ai": target_ai
+   }
+```
+
+3. **OpenHash 통계 API 추가**
+```python
+   @app.get("/openhash/stats")
+   async def openhash_stats():
+       return get_hash_statistics()
+```
+
+**API 응답 예시:**
+```json
+{
+  "response": "안녕하세요!",
+  "ai_type": "personal",
+  "model_used": "Qwen2.5-0.5B",
+  "conv_id": 1,
+  "hash_info": {
+    "hash_id": "hash_20251230115539_2c503beb",
+    "layer": 1,
+    "target_ai": "ai_06"
+  }
+}
+```
+
+---
+
+### 39단계: 사용자 검색 API 구현
+
+**새로운 엔드포인트:**
+
+**GET /users/list** - 모든 사용자 목록 조회
+```python
+@app.get("/users/list", response_model=List[UserInfo])
+async def list_users():
+    # 사람 사용자 + AI 사용자 통합 반환
+    return [
+        UserInfo(
+            user_id="test_user",
+            name="테스트 사용자",
+            user_type="사람",
+            is_online=True
+        ),
+        UserInfo(
+            user_id="ai_01",
+            name="국세청",
+            user_type="기관",
+            is_online=True
+        ),
+        # ...
+    ]
+```
+
+**POST /chat** - 대화 상대 지정 지원
+```python
+class ChatRequest(BaseModel):
+    user_id: str
+    message: str
+    target_user: Optional[str] = None  # 대화 상대 지정
+    ai_type: str = "personal"
+```
+
+- `target_user` 없음: 개인 비서 AI (Qwen 0.5B)
+- `target_user` 있음: 해당 AI의 system_prompt 사용 (Qwen 3B)
+
+---
+
+### 40단계: 프론트엔드 검색 기능
+
+**파일:** `/home/ec2-user/gopang/frontend/public/scripts/main.js`
+
+**새로운 기능:**
+
+1. **사용자 목록 로드**
+```javascript
+   async loadUsers() {
+       const response = await fetch(`${API_URL}/users/list`);
+       this.allUsers = await response.json();
+   }
+```
+
+2. **검색 모달**
+   - 검색 버튼 클릭 → 모달 팝업
+   - 실시간 검색 필터링
+   - 사용자 선택 → 대화 상대 변경
+
+3. **대화 상대 선택**
+```javascript
+   selectTarget(userId) {
+       const user = this.allUsers.find(u => u.user_id === userId);
+       this.currentTarget = user;
+       this.updateTargetDisplay();
+   }
+```
+
+4. **메시지 전송 (대화 상대 반영)**
+```javascript
+   const requestData = {
+       user_id: this.currentUser.userId,
+       message: message,
+       target_user: this.currentTarget?.user_id,
+       ai_type: this.currentTarget ? 'institution' : 'personal'
+   };
+```
+
+**UI 구조:**
+```
+┌─────────────────────────────────┐
+│ 홍길동  🔍  로그아웃            │ ← 헤더
+├─────────────────────────────────┤
+│ 🤖 내 AI 비서 (또는 선택한 AI) │ ← 대화 상대
+├─────────────────────────────────┤
+│                                 │
+│  메시지 영역                     │
+│                                 │
+├─────────────────────────────────┤
+│ [입력창]           [전송]       │
+└─────────────────────────────────┘
+```
+
+---
+
+### 41단계: 검색 모달 UI 스타일
+
+**파일:** `/home/ec2-user/gopang/frontend/public/styles/main.css`
+
+**추가된 스타일:**
+
+1. **검색 모달**
+   - 반투명 오버레이
+   - 중앙 정렬 모달 창
+   - 최대 높이 80vh (스크롤 가능)
+
+2. **사용자 아이템**
+   - 아바타: 사람 👤, 기관 🏛️
+   - 이름 + 유형 표시
+   - 온라인 상태 표시 (녹색 점)
+   - 호버/액티브 효과
+
+3. **검색 입력**
+   - 라운드 디자인
+   - 포커스 효과
+   - 실시간 필터링
+
+**예시 UI:**
+```
+┌────────────────────────────┐
+│ 대화 상대 선택          × │
+├────────────────────────────┤
+│ [🔍 이름 검색...]         │
+├────────────────────────────┤
+│ 👤 김철수                 │
+│    사람               ●   │
+├────────────────────────────┤
+│ 🏛️ 국세청                 │
+│    기관               ●   │
+├────────────────────────────┤
+│ 🏛️ 제주시청               │
+│    기관               ●   │
+└────────────────────────────┘
+```
+
+---
+
+## 📊 Phase 1 완료 현황 (90%)
+
+### ✅ 완료된 작업
+
+| 항목 | 상태 | 비고 |
+|------|------|------|
+| EC2 인프라 | ✅ | t2.medium, Ubuntu 24.04 |
+| AI 서버 (llama.cpp) | ✅ | Qwen 0.5B + 3B |
+| FastAPI 백엔드 | ✅ | 한국어 응답, DB 연동 |
+| SQLite 데이터베이스 | ✅ | 6개 테이블 |
+| OpenHash 기본 구조 | ✅ | 해시 생성, Layer 선택 |
+| 프론트엔드 (HTML/CSS/JS) | ✅ | Material Design |
+| 로그인/로그아웃 | ✅ | localStorage |
+| 채팅 기능 | ✅ | 실시간 AI 응답 |
+| 검색 기능 | ✅ | 사용자 + AI 목록 |
+| 대화 상대 선택 | ✅ | 동적 AI 전환 |
+
+### 🔲 Phase 1 마무리 작업 (10%)
+
+- [ ] 통합 테스트
+- [ ] 버그 수정
+- [ ] GitHub 커밋
+- [ ] 문서화 최종 업데이트
+
+---
+
+## 🎯 Phase 2 예정 작업 (프로토타입 완성)
+
+### 1. 타임스탬프 + 지역코드 결합 해시 (1시간)
+```python
+H_combined = SHA256(H_doc || T || R)
+random_value = (H_combined[0:8] as uint64) % 1000
+```
+
+### 2. 계층 간 해시 전파 (3시간)
+- Layer 1 → Layer 2 → Layer 3 → Layer 4
+- 머클트리 통합
+- 상위 계층 동기화
+
+### 3. 기본 신뢰도 계산 (2시간)
+```
+Trust_Score = Layer_Weight × Time_Factor
+Layer 1: 1.0, Layer 2: 1.5, Layer 3: 2.0, Layer 4: 2.5
+Time_Factor = 1 + log(1 + Days/365)
+```
+
+---
+
+## 📈 시스템 성능 (Phase 1)
+
+### 응답 시간
+- Qwen 0.5B: 3-5초
+- Qwen 3B: 5-8초
+- API: <100ms
+
+### 메모리 사용
+- 시스템: 500MB
+- llama-server: 3.9GB
+- FastAPI: 43MB
+- 총: 4.5GB / 4GB
+
+### OpenHash 통계
+- 총 해시: 1개
+- Layer 1: 1개
+- 평균 해시 생성 시간: <1ms
+
+---
+
+## 🔒 보안 현황
+
+### 구현됨
+- ✅ SSH 키 기반 인증
+- ✅ 최소 파일 권한
+- ✅ SHA-256 해시 (암호학적 보안)
+
+### 미구현 (프로덕션 필요)
+- ⚠️ HTTPS (Let's Encrypt)
+- ⚠️ JWT 인증
+- ⚠️ ECDSA P-256 디지털 서명
+- ⚠️ Rate Limiting
+
+---
+
+**마지막 업데이트:** 2025-12-30  
+**버전:** 1.2.0  
+**Phase 1 진행률:** 90%  
+**다음 마일스톤:** Phase 1 완료 → GitHub 커밋 → Phase 2 시작
+

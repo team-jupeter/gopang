@@ -2,8 +2,9 @@
 class GopangChat {
     constructor() {
         this.currentUser = null;
-        this.currentAI = 'personal';
+        this.currentTarget = null;  // 현재 대화 상대
         this.socket = null;
+        this.allUsers = [];
         this.init();
     }
 
@@ -25,10 +26,23 @@ class GopangChat {
             logoutBtn.addEventListener('click', () => this.handleLogout());
         }
 
-        // AI 선택
-        document.querySelectorAll('.ai-tab').forEach(tab => {
-            tab.addEventListener('click', (e) => this.handleAISwitch(e));
-        });
+        // 검색 버튼
+        const searchBtn = document.getElementById('searchBtn');
+        if (searchBtn) {
+            searchBtn.addEventListener('click', () => this.openSearchModal());
+        }
+
+        // 검색 모달 닫기
+        const closeModal = document.getElementById('closeModal');
+        if (closeModal) {
+            closeModal.addEventListener('click', () => this.closeSearchModal());
+        }
+
+        // 검색 입력
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => this.handleSearch(e.target.value));
+        }
 
         // 메시지 전송
         const sendBtn = document.getElementById('sendBtn');
@@ -43,6 +57,14 @@ class GopangChat {
                 if (e.key === 'Enter') this.sendMessage();
             });
         }
+
+        // 모달 외부 클릭 시 닫기
+        const searchModal = document.getElementById('searchModal');
+        if (searchModal) {
+            searchModal.addEventListener('click', (e) => {
+                if (e.target === searchModal) this.closeSearchModal();
+            });
+        }
     }
 
     checkLoginStatus() {
@@ -50,7 +72,7 @@ class GopangChat {
         if (savedUser) {
             this.currentUser = JSON.parse(savedUser);
             this.showChatScreen();
-            this.connectSocket();
+            this.loadUsers();
         }
     }
 
@@ -68,8 +90,8 @@ class GopangChat {
         this.showLoading(true);
 
         try {
-            // 사용자 생성 (없으면)
-            const response = await fetch(`${APP_CONFIG.API_URL}/users`, {
+            // 사용자 생성
+            await fetch(`${APP_CONFIG.API_URL}/users`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -79,13 +101,13 @@ class GopangChat {
                     user_type: 'personal',
                     name: userName
                 })
-            }).catch(() => null); // 이미 존재하면 무시
+            }).catch(() => null);
 
             this.currentUser = { userId, userName };
             localStorage.setItem('gopang_user', JSON.stringify(this.currentUser));
             
             this.showChatScreen();
-            this.connectSocket();
+            this.loadUsers();
             
         } catch (error) {
             console.error('로그인 실패:', error);
@@ -98,46 +120,110 @@ class GopangChat {
     handleLogout() {
         if (confirm('로그아웃 하시겠습니까?')) {
             localStorage.removeItem('gopang_user');
-            if (this.socket) {
-                this.socket.disconnect();
-            }
             this.currentUser = null;
+            this.currentTarget = null;
+            this.allUsers = [];
             this.showLoginScreen();
         }
     }
 
-    handleAISwitch(e) {
-        const aiType = e.currentTarget.dataset.ai;
-        
-        // 탭 활성화
-        document.querySelectorAll('.ai-tab').forEach(tab => {
-            tab.classList.remove('active');
-        });
-        e.currentTarget.classList.add('active');
-        
-        this.currentAI = aiType;
-        
-        // 시스템 메시지 추가
-        const aiName = aiType === 'personal' ? '개인 AI (0.5B)' : '기관 AI (3B)';
-        this.addMessage('system', `${aiName}로 전환되었습니다.`);
+    async loadUsers() {
+        try {
+            const response = await fetch(`${APP_CONFIG.API_URL}/users/list`);
+            if (!response.ok) throw new Error('사용자 목록 로드 실패');
+            
+            this.allUsers = await response.json();
+            this.renderUserList(this.allUsers);
+            
+        } catch (error) {
+            console.error('사용자 목록 로드 실패:', error);
+        }
     }
 
-    connectSocket() {
-        this.socket = io(APP_CONFIG.SOCKET_URL);
+    openSearchModal() {
+        const modal = document.getElementById('searchModal');
+        if (modal) {
+            modal.style.display = 'flex';
+            document.getElementById('searchInput').focus();
+        }
+    }
 
-        this.socket.on('connect', () => {
-            console.log('Socket.IO 연결됨');
-            this.addMessage('system', '서버에 연결되었습니다.');
-        });
+    closeSearchModal() {
+        const modal = document.getElementById('searchModal');
+        if (modal) {
+            modal.style.display = 'none';
+            document.getElementById('searchInput').value = '';
+            this.renderUserList(this.allUsers);
+        }
+    }
 
-        this.socket.on('disconnect', () => {
-            console.log('Socket.IO 연결 끊김');
-            this.addMessage('system', '서버와의 연결이 끊어졌습니다.');
-        });
+    handleSearch(query) {
+        if (!query.trim()) {
+            this.renderUserList(this.allUsers);
+            return;
+        }
 
-        this.socket.on('receive_message', (data) => {
-            this.handleAIResponse(data);
+        const filtered = this.allUsers.filter(user => 
+            user.name.includes(query) || user.user_id.includes(query)
+        );
+        this.renderUserList(filtered);
+    }
+
+    renderUserList(users) {
+        const userList = document.getElementById('userList');
+        if (!userList) return;
+
+        if (users.length === 0) {
+            userList.innerHTML = '<div class="no-results">검색 결과가 없습니다.</div>';
+            return;
+        }
+
+        userList.innerHTML = users.map(user => `
+            <div class="user-item" data-user-id="${user.user_id}">
+                <div class="user-avatar">${user.user_type === '사람' ? '👤' : '🏛️'}</div>
+                <div class="user-info">
+                    <div class="user-name">${user.name}</div>
+                    <div class="user-type">${user.user_type}</div>
+                </div>
+                ${user.is_online ? '<span class="online-badge">●</span>' : ''}
+            </div>
+        `).join('');
+
+        // 사용자 클릭 이벤트
+        userList.querySelectorAll('.user-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const userId = item.dataset.userId;
+                this.selectTarget(userId);
+            });
         });
+    }
+
+    selectTarget(userId) {
+        const user = this.allUsers.find(u => u.user_id === userId);
+        if (!user) return;
+
+        // 자기 자신은 선택 불가
+        if (userId === this.currentUser.userId) {
+            alert('자기 자신과는 대화할 수 없습니다.');
+            return;
+        }
+
+        this.currentTarget = user;
+        this.closeSearchModal();
+        this.updateTargetDisplay();
+        this.addMessage('system', `${user.name}와(과) 대화를 시작합니다.`);
+    }
+
+    updateTargetDisplay() {
+        const targetName = document.getElementById('targetName');
+        if (targetName) {
+            if (this.currentTarget) {
+                const icon = this.currentTarget.user_type === '사람' ? '👤' : '🏛️';
+                targetName.textContent = `${icon} ${this.currentTarget.name}`;
+            } else {
+                targetName.textContent = '🤖 내 AI 비서';
+            }
+        }
     }
 
     async sendMessage() {
@@ -154,17 +240,23 @@ class GopangChat {
         this.showTyping(true);
 
         try {
-            // REST API 방식
+            const requestData = {
+                user_id: this.currentUser.userId,
+                message: message,
+                ai_type: this.currentTarget ? 'institution' : 'personal'
+            };
+
+            // 대화 상대가 있으면 target_user 추가
+            if (this.currentTarget) {
+                requestData.target_user = this.currentTarget.user_id;
+            }
+
             const response = await fetch(`${APP_CONFIG.API_URL}/chat`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    user_id: this.currentUser.userId,
-                    message: message,
-                    ai_type: this.currentAI
-                })
+                body: JSON.stringify(requestData)
             });
 
             if (!response.ok) {
@@ -176,20 +268,15 @@ class GopangChat {
             this.showTyping(false);
             this.addMessage('ai', data.response, data.model_used);
 
+            // OpenHash 정보 표시 (개발 모드)
+            if (data.hash_info && console) {
+                console.log('OpenHash:', data.hash_info);
+            }
+
         } catch (error) {
             console.error('메시지 전송 실패:', error);
             this.showTyping(false);
             this.addMessage('system', '메시지 전송에 실패했습니다. 다시 시도해주세요.');
-        }
-    }
-
-    handleAIResponse(data) {
-        this.showTyping(false);
-        
-        if (data.success) {
-            this.addMessage('ai', data.ai_response, data.model_used);
-        } else {
-            this.addMessage('system', 'AI 응답 생성에 실패했습니다.');
         }
     }
 
@@ -260,6 +347,9 @@ class GopangChat {
         if (usernameSpan && this.currentUser) {
             usernameSpan.textContent = this.currentUser.userName;
         }
+
+        // 대화 상대 표시 업데이트
+        this.updateTargetDisplay();
 
         // 메시지 입력창 포커스
         setTimeout(() => {
