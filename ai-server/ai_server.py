@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Gopang FastAPI AI Server with OpenHash Integration
+Gopang FastAPI AI Server with OpenHash + Trust Calculation
 """
 import aiohttp
 import sqlite3
@@ -13,8 +13,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
 from openhash.hash_generator import create_hash_record, get_hash_statistics
+from openhash.layer_propagation import LayerPropagation
+from openhash.trust_calculator import TrustCalculator
 
-app = FastAPI(title="Gopang AI Server")
+app = FastAPI(title="Gopang AI Server with OpenHash")
 
 app.add_middleware(
     CORSMiddleware,
@@ -31,7 +33,7 @@ DB_PATH = "/home/ec2-user/gopang/database/gopang.db"
 class ChatRequest(BaseModel):
     user_id: str
     message: str
-    target_user: Optional[str] = None  # 대화 상대 지정
+    target_user: Optional[str] = None
     ai_type: str = "personal"
 
 class ChatResponse(BaseModel):
@@ -40,6 +42,7 @@ class ChatResponse(BaseModel):
     model_used: str
     conv_id: Optional[int] = None
     hash_info: Optional[dict] = None
+    trust_score: Optional[float] = None
 
 class User(BaseModel):
     user_id: str
@@ -115,11 +118,12 @@ async def root():
     return {
         "service": "Gopang AI Server",
         "status": "running",
-        "models": {
-            "personal": "Qwen2.5-0.5B",
-            "institution": "Qwen2.5-3B"
-        },
-        "openhash": "enabled"
+        "version": "Phase 2 Complete",
+        "features": {
+            "openhash": "enabled",
+            "layer_propagation": "enabled",
+            "trust_calculation": "enabled"
+        }
     }
 
 @app.get("/health")
@@ -128,12 +132,10 @@ async def health():
 
 @app.get("/users/list", response_model=List[UserInfo])
 async def list_users():
-    """모든 사용자 목록 조회 (사람 + AI)"""
     try:
         conn = get_db()
         cursor = conn.cursor()
         
-        # 사람 사용자
         cursor.execute("""
             SELECT user_id, name, user_type, 1 as is_online
             FROM users
@@ -141,7 +143,6 @@ async def list_users():
         """)
         humans = cursor.fetchall()
         
-        # AI 사용자
         cursor.execute("""
             SELECT ai_id as user_id, ai_name as name, ai_type as user_type, 1 as is_online
             FROM ai_users
@@ -176,7 +177,6 @@ async def list_users():
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     try:
-        # 대화 상대가 지정되지 않으면 개인 AI 사용
         if not request.target_user:
             server_url = LLAMA_SERVER_0_5B
             model_name = "Qwen2.5-0.5B"
@@ -192,12 +192,10 @@ async def chat(request: ChatRequest):
 사용자: {request.message}
 AI:"""
         else:
-            # 대화 상대가 AI 기관이면 Qwen 3B 사용
             server_url = LLAMA_SERVER_3B
             model_name = "Qwen2.5-3B"
             max_tokens = 120
             
-            # AI 사용자의 system prompt 가져오기
             conn = get_db()
             cursor = conn.cursor()
             cursor.execute("SELECT system_prompt FROM ai_users WHERE ai_id = ?", (request.target_user,))
@@ -213,7 +211,6 @@ AI:"""
         
         ai_response = await call_llama_server(server_url, prompt, max_tokens)
         
-        # 대화 기록 저장
         conv_id = save_conversation(
             user_id=request.user_id,
             message=request.message,
@@ -223,16 +220,21 @@ AI:"""
         
         # OpenHash 레코드 생성
         conversation_content = f"{request.message}\n{ai_response}"
-        hash_id, layer, target_ai = create_hash_record(
+        hash_id, layer, target_ai, metadata = create_hash_record(
             user_id=request.user_id,
             content=conversation_content,
             content_type='conversation'
         )
         
+        # 신뢰도 계산
+        calculator = TrustCalculator()
+        trust_data = calculator.calculate_trust(hash_id)
+        
         hash_info = {
             "hash_id": hash_id,
             "layer": layer,
-            "target_ai": target_ai
+            "target_ai": target_ai,
+            "algorithm": metadata['algorithm']
         }
         
         return ChatResponse(
@@ -240,7 +242,8 @@ AI:"""
             ai_type=request.ai_type,
             model_used=model_name,
             conv_id=conv_id,
-            hash_info=hash_info
+            hash_info=hash_info,
+            trust_score=trust_data.get('trust_score', 0.0)
         )
         
     except Exception as e:
@@ -284,6 +287,40 @@ async def openhash_stats():
     try:
         stats = get_hash_statistics()
         return stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/openhash/propagate")
+async def propagate_layers():
+    """계층 간 해시 전파 실행"""
+    try:
+        propagation = LayerPropagation()
+        results = propagation.propagate_all()
+        return results
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/openhash/trust/{hash_id}")
+async def get_trust_score(hash_id: str):
+    """특정 해시의 신뢰도 조회"""
+    try:
+        calculator = TrustCalculator()
+        trust_data = calculator.calculate_trust(hash_id)
+        return trust_data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/openhash/trust/all")
+async def get_all_trust_scores():
+    """모든 해시의 신뢰도 조회"""
+    try:
+        calculator = TrustCalculator()
+        trust_scores = calculator.get_all_trust_scores()
+        return {
+            "total": len(trust_scores),
+            "scores": trust_scores,
+            "average": sum(ts['trust_score'] for ts in trust_scores) / len(trust_scores) if trust_scores else 0
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
