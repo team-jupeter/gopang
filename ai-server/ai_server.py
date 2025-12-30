@@ -1,20 +1,13 @@
 #!/usr/bin/env python3
-"""
-Gopang FastAPI AI Server with Database Integration
-"""
 import aiohttp
 import sqlite3
-import json
-from datetime import datetime
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
-import os
 
 app = FastAPI(title="Gopang AI Server")
 
-# CORS 설정
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -23,14 +16,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# llama-server URL
 LLAMA_SERVER_0_5B = "http://127.0.0.1:8001"
 LLAMA_SERVER_3B = "http://127.0.0.1:8002"
-
-# 데이터베이스 경로
 DB_PATH = "/home/ec2-user/gopang/database/gopang.db"
 
-# Pydantic 모델
 class ChatRequest(BaseModel):
     user_id: str
     message: str
@@ -55,15 +44,12 @@ class ConversationHistory(BaseModel):
     ai_type: str
     created_at: str
 
-# 데이터베이스 함수
 def get_db():
-    """데이터베이스 연결"""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 def save_conversation(user_id: str, message: str, response: str, ai_type: str) -> int:
-    """대화 기록 저장"""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute(
@@ -76,7 +62,6 @@ def save_conversation(user_id: str, message: str, response: str, ai_type: str) -
     return conv_id
 
 async def call_llama_server(url: str, prompt: str, max_tokens: int = 100) -> str:
-    """llama-server HTTP API 호출"""
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(
@@ -84,8 +69,10 @@ async def call_llama_server(url: str, prompt: str, max_tokens: int = 100) -> str
                 json={
                     "prompt": prompt,
                     "n_predict": max_tokens,
-                    "temperature": 0.7,
+                    "temperature": 0.8,
                     "top_p": 0.9,
+                    "top_k": 40,
+                    "repeat_penalty": 1.1,
                     "stream": False
                 },
                 timeout=aiohttp.ClientTimeout(total=30)
@@ -96,15 +83,17 @@ async def call_llama_server(url: str, prompt: str, max_tokens: int = 100) -> str
                 data = await response.json()
                 content = data.get("content", "").strip()
                 
-                if "Assistant:" in content:
-                    content = content.split("Assistant:")[-1].strip()
+                # 불필요한 프롬프트 반복 제거
+                if "사용자:" in content:
+                    content = content.split("사용자:")[0].strip()
+                if "AI:" in content:
+                    content = content.split("AI:")[-1].strip()
                 
-                return content if content else "응답을 생성할 수 없습니다."
+                return content if content else "죄송해요, 답변을 생성하지 못했어요."
                 
     except Exception as e:
         raise Exception(f"AI generation error: {str(e)}")
 
-# API 엔드포인트
 @app.get("/")
 async def root():
     return {
@@ -113,9 +102,7 @@ async def root():
         "models": {
             "personal": "Qwen2.5-0.5B",
             "institution": "Qwen2.5-3B"
-        },
-        "backend": "llama-server",
-        "database": "SQLite"
+        }
     }
 
 @app.get("/health")
@@ -124,26 +111,38 @@ async def health():
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    """AI 채팅 엔드포인트 (대화 기록 저장)"""
     try:
-        # 모델 선택
         if request.ai_type == "personal":
             server_url = LLAMA_SERVER_0_5B
             model_name = "Qwen2.5-0.5B"
-            max_tokens = 100
+            max_tokens = 80
+            # 간결하고 자연스러운 프롬프트
+            prompt = f"""너는 친근한 개인 비서야. 한국어로만 대화해.
+
+규칙:
+- 짧고 간단하게 답변
+- 존댓말 사용
+- 자연스럽게 대화
+- 한 문장으로 답변
+
+사용자: {request.message}
+AI:"""
         else:
             server_url = LLAMA_SERVER_3B
             model_name = "Qwen2.5-3B"
-            max_tokens = 150
+            max_tokens = 120
+            prompt = f"""당신은 정부 기관 AI입니다. 한국어로만 답변하세요.
+
+규칙:
+- 정확하고 공식적인 어조
+- 2-3 문장으로 간결하게
+- 존댓말 사용
+
+사용자: {request.message}
+AI:"""
         
-        # System prompt
-        system_prompt = "You are a helpful AI assistant. Respond in Korean briefly and naturally."
-        prompt = f"{system_prompt}\n\nUser: {request.message}\nAssistant:"
-        
-        # AI 응답 생성
         ai_response = await call_llama_server(server_url, prompt, max_tokens)
         
-        # 데이터베이스에 저장
         conv_id = save_conversation(
             user_id=request.user_id,
             message=request.message,
@@ -163,7 +162,6 @@ async def chat(request: ChatRequest):
 
 @app.get("/history/{user_id}", response_model=List[ConversationHistory])
 async def get_history(user_id: str, limit: int = 10):
-    """사용자 대화 기록 조회"""
     try:
         conn = get_db()
         cursor = conn.cursor()
@@ -196,7 +194,6 @@ async def get_history(user_id: str, limit: int = 10):
 
 @app.post("/users", response_model=User)
 async def create_user(user: User):
-    """사용자 생성"""
     try:
         conn = get_db()
         cursor = conn.cursor()
@@ -207,8 +204,8 @@ async def create_user(user: User):
         conn.commit()
         conn.close()
         return user
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except:
+        return user
 
 if __name__ == "__main__":
     import uvicorn

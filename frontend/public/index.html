@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>고팡</title>
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <!-- 로그인 화면 -->
+    <div id="loginScreen" class="screen active">
+        <div class="login-container">
+            <div class="logo">
+                <h1>고팡</h1>
+                <p>AI 통합 플랫폼</p>
+            </div>
+            <form id="loginForm" class="login-form">
+                <input type="text" id="userId" placeholder="사용자 ID" required>
+                <input type="text" id="userName" placeholder="이름" required>
+                <button type="submit" class="btn-login">로그인</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 채팅 화면 -->
+    <div id="chatScreen" class="screen">
+        <!-- 헤더 -->
+        <header class="chat-header">
+            <span id="username" class="username"></span>
+            <div class="header-actions">
+                <button id="searchBtn" class="btn-icon" title="대화 상대 검색">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                    </svg>
+                </button>
+                <button id="logoutBtn" class="btn-text">로그아웃</button>
+            </div>
+        </header>
+
+        <!-- 대화 상대 표시 -->
+        <div class="chat-target">
+            <div class="target-info">
+                <span class="target-icon">🤖</span>
+                <span id="targetName" class="target-name">내 AI 비서</span>
+            </div>
+        </div>
+
+        <!-- 메시지 영역 -->
+        <div class="messages" id="messages">
+            <div class="message-date">오늘</div>
+            <div class="message system">
+                <div class="message-bubble">
+                    안녕하세요! 무엇을 도와드릴까요?
+                </div>
+            </div>
+        </div>
+
+        <!-- 입력 영역 -->
+        <div class="input-container">
+            <input 
+                type="text" 
+                id="messageInput" 
+                placeholder="메시지 입력..."
+                autocomplete="off"
+            >
+            <button id="sendBtn" class="btn-send">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M2 21L23 12L2 3V10L17 12L2 14V21Z"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- 검색 모달 -->
+    <div id="searchModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>대화 상대 선택</h3>
+                <button id="closeModal" class="btn-close">×</button>
+            </div>
+            <div class="search-input-container">
+                <input type="text" id="searchInput" placeholder="이름 검색...">
+            </div>
+            <div class="user-list" id="userList">
+                <!-- JavaScript로 동적 생성 -->
+            </div>
+        </div>
+    </div>
+
+    <div id="loadingIndicator" class="loading-indicator">
+        <div class="spinner"></div>
+    </div>
+
+    <script src="scripts/config.js"></script>
+    <script src="scripts/socket.io.min.js"></script>
+    <script src="scripts/main.js"></script>
+</body>
+</html>
