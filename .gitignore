@@ -1,0 +1,36 @@
+# 가상환경
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# Node.js
+node_modules/
+npm-debug.log
+package-lock.json
+
+# 모델 파일 (용량 큼)
+*.gguf
+
+# 로그
+logs/*.log
+*.log
+
+# 환경 변수
+.env
+*.env
+
+# 빌드 파일
+llama.cpp/build/
+llama.cpp/.git/
+
+# 시스템
+.DS_Store
+*.swp
+*.swo
+*~
+
+# 백업
+*.backup
+*.bak
