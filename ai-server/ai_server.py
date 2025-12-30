@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Gopang FastAPI AI Server with OpenHash + Trust Calculation
+Gopang FastAPI AI Server with OpenHash + Trust + Digital Signature
 """
 import aiohttp
 import sqlite3
@@ -15,8 +15,9 @@ from typing import Optional, List
 from openhash.hash_generator import create_hash_record, get_hash_statistics
 from openhash.layer_propagation import LayerPropagation
 from openhash.trust_calculator import TrustCalculator
+from openhash.digital_signature import DigitalSignature
 
-app = FastAPI(title="Gopang AI Server with OpenHash")
+app = FastAPI(title="Gopang AI Server - Phase 3")
 
 app.add_middleware(
     CORSMiddleware,
@@ -35,6 +36,7 @@ class ChatRequest(BaseModel):
     message: str
     target_user: Optional[str] = None
     ai_type: str = "personal"
+    sign: bool = True  # 디지털 서명 활성화
 
 class ChatResponse(BaseModel):
     response: str
@@ -43,6 +45,7 @@ class ChatResponse(BaseModel):
     conv_id: Optional[int] = None
     hash_info: Optional[dict] = None
     trust_score: Optional[float] = None
+    signature_verified: Optional[bool] = None
 
 class User(BaseModel):
     user_id: str
@@ -118,11 +121,12 @@ async def root():
     return {
         "service": "Gopang AI Server",
         "status": "running",
-        "version": "Phase 2 Complete",
+        "version": "Phase 3 - Digital Signature",
         "features": {
             "openhash": "enabled",
             "layer_propagation": "enabled",
-            "trust_calculation": "enabled"
+            "trust_calculation": "enabled",
+            "digital_signature": "enabled (ECDSA-P256)"
         }
     }
 
@@ -218,23 +222,33 @@ AI:"""
             ai_type=request.ai_type
         )
         
-        # OpenHash 레코드 생성
+        # OpenHash 레코드 생성 + 디지털 서명
         conversation_content = f"{request.message}\n{ai_response}"
         hash_id, layer, target_ai, metadata = create_hash_record(
             user_id=request.user_id,
             content=conversation_content,
-            content_type='conversation'
+            content_type='conversation',
+            sign=request.sign
         )
         
         # 신뢰도 계산
         calculator = TrustCalculator()
         trust_data = calculator.calculate_trust(hash_id)
         
+        # 서명 검증
+        signature_verified = None
+        if request.sign and metadata.get('signature'):
+            ds = DigitalSignature()
+            signature_verified = ds.verify_signature(hash_id, metadata['combined_hash'])
+        
         hash_info = {
             "hash_id": hash_id,
             "layer": layer,
             "target_ai": target_ai,
-            "algorithm": metadata['algorithm']
+            "algorithm": metadata['algorithm'],
+            "previous_hash": metadata['previous_hash'],
+            "signed": metadata.get('signature') is not None,
+            "signature_id": metadata['signature']['signature_id'] if metadata.get('signature') else None
         }
         
         return ChatResponse(
@@ -243,7 +257,8 @@ AI:"""
             model_used=model_name,
             conv_id=conv_id,
             hash_info=hash_info,
-            trust_score=trust_data.get('trust_score', 0.0)
+            trust_score=trust_data.get('trust_score', 0.0),
+            signature_verified=signature_verified
         )
         
     except Exception as e:
@@ -324,6 +339,64 @@ async def get_all_trust_scores():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/signature/{hash_id}")
+async def get_signature(hash_id: str):
+    """특정 해시의 서명 정보 조회"""
+    try:
+        ds = DigitalSignature()
+        sig_info = ds.get_signature_info(hash_id)
+        
+        if not sig_info:
+            raise HTTPException(status_code=404, detail="Signature not found")
+        
+        return sig_info
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/signature/verify/{hash_id}")
+async def verify_signature(hash_id: str):
+    """서명 검증"""
+    try:
+        # 해시 조회
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT content_hash FROM openhash_records
+            WHERE hash_id = ?
+        """, (hash_id,))
+        
+        record = cursor.fetchone()
+        conn.close()
+        
+        if not record:
+            raise HTTPException(status_code=404, detail="Hash not found")
+        
+        # 서명 검증
+        ds = DigitalSignature()
+        is_valid = ds.verify_signature(hash_id, record['content_hash'])
+        
+        return {
+            "hash_id": hash_id,
+            "verified": is_valid,
+            "algorithm": "ECDSA-P256-SHA256"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/signature/verify-chain")
+async def verify_chain(hash_ids: List[str]):
+    """체인 무결성 검증"""
+    try:
+        ds = DigitalSignature()
+        results = ds.verify_chain_integrity(hash_ids)
+        return results
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/users", response_model=User)
 async def create_user(user: User):
     try:
@@ -334,6 +407,11 @@ async def create_user(user: User):
             (user.user_id, user.user_type, user.name, user.region_code)
         )
         conn.commit()
+        
+        # 키 쌍 생성
+        ds = DigitalSignature()
+        ds.generate_key_pair(user.user_id)
+        
         conn.close()
         
         return user
