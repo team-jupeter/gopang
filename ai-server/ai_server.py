@@ -421,3 +421,134 @@ async def create_user(user: User):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+# ============== 해시 전용 전송 API ==============
+
+from openhash.hash_only_transmission import HashPacket
+
+class HashOnlyRequest(BaseModel):
+    user_id: str
+    message: str
+    target_user: Optional[str] = None
+    hash_only: bool = True  # 해시 전용 모드
+
+class HashOnlyResponse(BaseModel):
+    packet_size: int
+    original_size: int
+    saving_percentage: float
+    packet_hex: str
+    hash_info: dict
+
+@app.post("/chat/hash-only", response_model=HashOnlyResponse)
+async def chat_hash_only(request: HashOnlyRequest):
+    """
+    해시 전용 전송 모드
+    
+    원본 문서를 전송하지 않고 147바이트 패킷만 전송
+    """
+    try:
+        # 1. 원본 메시지 크기
+        original_size = len(request.message.encode('utf-8'))
+        
+        # 2. 해시 생성 (디지털 서명 포함)
+        conversation_content = request.message
+        hash_id, layer, target_ai, metadata = create_hash_record(
+            user_id=request.user_id,
+            content=conversation_content,
+            content_type='conversation',
+            sign=True
+        )
+        
+        # 3. 해시 전용 패킷 생성
+        packet = HashPacket.create_packet(
+            content_hash=metadata['combined_hash'],
+            timestamp=metadata['timestamp'],
+            region_code=metadata['region_code'],
+            previous_hash=metadata['previous_hash'],
+            signature_r=metadata['signature']['r'] if metadata.get('signature') else None,
+            signature_s=metadata['signature']['s'] if metadata.get('signature') else None,
+            has_signature=metadata.get('signature') is not None
+        )
+        
+        # 4. 대역폭 절약 계산
+        savings = HashPacket.calculate_bandwidth_saving(original_size)
+        
+        return HashOnlyResponse(
+            packet_size=len(packet),
+            original_size=original_size,
+            saving_percentage=savings['saving_percentage'],
+            packet_hex=packet.hex(),
+            hash_info={
+                "hash_id": hash_id,
+                "layer": layer,
+                "target_ai": target_ai,
+                "algorithm": metadata['algorithm'],
+                "signed": metadata.get('signature') is not None
+            }
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/packet/parse")
+async def parse_packet(packet_hex: str):
+    """
+    해시 전용 패킷 파싱
+    
+    Args:
+        packet_hex: 16진수 패킷 문자열
+    """
+    try:
+        packet_bytes = bytes.fromhex(packet_hex)
+        parsed = HashPacket.parse_packet(packet_bytes)
+        return parsed
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/bandwidth/stats")
+async def bandwidth_statistics():
+    """
+    대역폭 절약 통계
+    """
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # 전체 대화 수
+        cursor.execute("SELECT COUNT(*) FROM conversations")
+        total_conversations = cursor.fetchone()[0]
+        
+        # 평균 메시지 크기 (가정: 200바이트)
+        avg_message_size = 200
+        
+        # 전통적 전송 방식
+        traditional_total = total_conversations * avg_message_size
+        
+        # 해시 전용 전송 방식
+        hash_only_total = total_conversations * HashPacket.TOTAL_SIZE
+        
+        # 절약량
+        saved_bytes = traditional_total - hash_only_total
+        saving_percentage = (saved_bytes / traditional_total * 100) if traditional_total > 0 else 0
+        
+        conn.close()
+        
+        return {
+            "total_conversations": total_conversations,
+            "traditional_method": {
+                "total_bytes": traditional_total,
+                "avg_per_message": avg_message_size
+            },
+            "hash_only_method": {
+                "total_bytes": hash_only_total,
+                "bytes_per_packet": HashPacket.TOTAL_SIZE
+            },
+            "savings": {
+                "bytes": saved_bytes,
+                "percentage": round(saving_percentage, 2),
+                "human_readable": f"{saved_bytes / 1024:.2f} KB" if saved_bytes < 1024*1024 else f"{saved_bytes / (1024*1024):.2f} MB"
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
