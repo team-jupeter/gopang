@@ -1,0 +1,60 @@
+:root {
+    /* 브랜드 컬러 - 정부 청색 */
+    --primary: #0057A8;
+    --primary-dark: #004080;
+    --primary-light: #E3F2FD;
+    --secondary: #1976D2;
+    --accent: #00BFA5;
+    
+    /* AI 컬러 */
+    --ai-color: #7C4DFF;
+    
+    /* 배경 */
+    --bg-primary: #F5F5F5;
+    --bg-secondary: #FFFFFF;
+    --bg-dark: #1A1A2E;
+    
+    /* 텍스트 */
+    --text-primary: #333333;
+    --text-secondary: #757575;
+    --text-light: #9E9E9E;
+    --text-inverse: #FFFFFF;
+    
+    /* 상태 */
+    --success: #4CAF50;
+    --warning: #FF9800;
+    --error: #F44336;
+    --info: #2196F3;
+    
+    /* 계층 색상 (OpenHash) */
+    --layer-1: #4CAF50;
+    --layer-2: #8BC34A;
+    --layer-3: #CDDC39;
+    --layer-4: #FF9800;
+    
+    /* 그림자 */
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.1);
+    --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
+    --shadow-lg: 0 10px 20px rgba(0,0,0,0.15);
+    
+    /* 간격 */
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
+    --spacing-lg: 24px;
+    --spacing-xl: 32px;
+    
+    /* 라운드 */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 16px;
+    --radius-xl: 24px;
+    --radius-full: 50%;
+    
+    /* Safe Area */
+    --safe-top: env(safe-area-inset-top);
+    --safe-bottom: env(safe-area-inset-bottom);
+    
+    /* 폰트 */
+    --font-family: 'Noto Sans KR', -apple-system, sans-serif;
+}

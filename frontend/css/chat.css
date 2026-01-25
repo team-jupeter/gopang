@@ -1,0 +1,306 @@
+/* Messages Container */
+.messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    background: #FAFAFA;
+}
+
+/* Message */
+.message {
+    display: flex;
+    gap: 12px;
+    max-width: 85%;
+    animation: fadeIn 0.3s ease;
+}
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.message.sent {
+    align-self: flex-end;
+    flex-direction: row-reverse;
+}
+.message-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #E3F2FD;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.message-avatar .material-icons {
+    font-size: 22px;
+    color: #1976D2;
+}
+.message.sent .message-avatar {
+    background: #BBDEFB;
+}
+.message-body {
+    display: flex;
+    flex-direction: column;
+}
+.message-bubble {
+    padding: 12px 16px;
+    border-radius: 20px;
+    line-height: 1.5;
+    font-size: 15px;
+    background: #FFFFFF;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+.message.received .message-bubble {
+    border-bottom-left-radius: 4px;
+}
+.message.sent .message-bubble {
+    background: #1976D2;
+    color: white;
+    border-bottom-right-radius: 4px;
+}
+.message-time {
+    font-size: 11px;
+    color: #9E9E9E;
+    margin-top: 4px;
+    padding: 0 4px;
+}
+.message.sent .message-time {
+    text-align: right;
+}
+
+/* OpenHash Badge */
+.openhash-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 6px;
+    padding: 4px 10px;
+    background: #E8F5E9;
+    border-radius: 12px;
+    font-size: 11px;
+    color: #2E7D32;
+}
+.openhash-badge .material-icons {
+    font-size: 14px;
+}
+
+/* Input Area */
+.chat-input-area {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    padding: 12px 16px calc(12px + var(--safe-bottom));
+    background: #FFFFFF;
+    border-top: 1px solid #E0E0E0;
+}
+.chat-input-wrapper {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    background: #F5F5F5;
+    border-radius: 24px;
+    padding: 10px 16px;
+}
+.chat-input {
+    flex: 1;
+    border: none;
+    background: none;
+    font-size: 15px;
+    resize: none;
+    max-height: 100px;
+    line-height: 1.4;
+    font-family: inherit;
+}
+.chat-input::placeholder { color: #9E9E9E; }
+.chat-send-btn {
+    width: 48px;
+    height: 48px;
+    background: #1976D2;
+    border: none;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 2px 8px rgba(25,118,210,0.3);
+}
+.chat-send-btn:hover {
+    background: #1565C0;
+    transform: scale(1.05);
+}
+.chat-send-btn .material-icons {
+    font-size: 22px;
+}
+
+/* Conversation List */
+.conv-list {
+    flex: 1;
+    overflow-y: auto;
+    background: #FFFFFF;
+}
+.conv-section-title {
+    padding: 16px 16px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #1976D2;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: #FAFAFA;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+.conv-item {
+    display: flex;
+    align-items: center;
+    padding: 14px 16px;
+    background: #FFFFFF;
+    border-bottom: 1px solid #F0F0F0;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.conv-item:hover {
+    background: #F5F5F5;
+}
+.conv-item:active {
+    background: #E3F2FD;
+}
+.conv-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #E3F2FD;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 14px;
+    flex-shrink: 0;
+}
+.conv-avatar .material-icons {
+    font-size: 26px;
+    color: #1976D2;
+}
+.conv-info {
+    flex: 1;
+    min-width: 0;
+}
+.conv-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: #212121;
+    margin-bottom: 3px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.conv-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+    background: #1976D2;
+    color: white;
+}
+.conv-preview {
+    font-size: 13px;
+    color: #757575;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.conv-meta {
+    text-align: right;
+    margin-left: 12px;
+}
+.conv-time {
+    font-size: 11px;
+    color: #9E9E9E;
+    margin-bottom: 4px;
+}
+.conv-unread {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    background: #1976D2;
+    color: white;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+/* Chat Header */
+.chat-header {
+    display: flex;
+    align-items: center;
+    padding: calc(12px + var(--safe-top)) 12px 12px;
+    background: #1976D2;
+    color: white;
+}
+.chat-header-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+}
+.chat-header-avatar .material-icons {
+    font-size: 24px;
+    color: white;
+}
+.chat-header-info {
+    flex: 1;
+}
+.chat-header-name {
+    font-size: 16px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.chat-header-name .conv-badge {
+    background: rgba(255,255,255,0.3);
+    font-size: 9px;
+}
+.chat-header-status {
+    font-size: 12px;
+    opacity: 0.85;
+}
+.chat-header-actions {
+    display: flex;
+}
+
+/* Quick Actions */
+.quick-actions {
+    display: flex;
+    gap: 8px;
+    padding: 10px 16px;
+    overflow-x: auto;
+    background: #FFFFFF;
+    border-top: 1px solid #E0E0E0;
+}
+.quick-btn {
+    padding: 8px 16px;
+    background: #E3F2FD;
+    border: none;
+    border-radius: 18px;
+    font-size: 13px;
+    color: #1976D2;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.quick-btn:hover {
+    background: #1976D2;
+    color: white;
+}

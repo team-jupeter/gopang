@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GOPANG 재무제표</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        :root {
+            --primary-50: #E3F2FD;
+            --primary-100: #BBDEFB;
+            --primary-200: #90CAF9;
+            --primary-300: #64B5F6;
+            --primary-400: #42A5F5;
+            --primary-500: #2196F3;
+            --primary-600: #1E88E5;
+            --primary-700: #1976D2;
+            --primary-800: #1565C0;
+            --primary-900: #0D47A1;
+            --grey-50: #FAFAFA;
+            --grey-100: #F5F5F5;
+            --grey-200: #EEEEEE;
+            --grey-300: #E0E0E0;
+            --grey-600: #757575;
+            --grey-800: #424242;
+            --success: #4CAF50;
+            --warning: #FF9800;
+            --error: #F44336;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background: var(--grey-100);
+            color: var(--grey-800);
+            line-height: 1.6;
+        }
+        .header {
+            background: linear-gradient(135deg, var(--primary-700), var(--primary-900));
+            color: white;
+            padding: 16px 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 20px;
+            font-weight: 700;
+        }
+        .logo .material-icons { font-size: 28px; }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-size: 14px;
+        }
+        .user-badge {
+            background: rgba(255,255,255,0.2);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .summary-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border-left: 4px solid var(--primary-500);
+        }
+        .summary-card.positive { border-left-color: var(--success); }
+        .summary-card.negative { border-left-color: var(--error); }
+        .summary-card .label {
+            font-size: 12px;
+            color: var(--grey-600);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        .summary-card .value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--primary-800);
+        }
+        .summary-card .change {
+            font-size: 12px;
+            margin-top: 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .summary-card .change.up { color: var(--success); }
+        .summary-card .change.down { color: var(--error); }
+        .tabs {
+            display: flex;
+            gap: 4px;
+            background: white;
+            padding: 8px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .tab {
+            flex: 1;
+            padding: 12px 16px;
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--grey-600);
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .tab:hover { background: var(--grey-100); }
+        .tab.active {
+            background: var(--primary-500);
+            color: white;
+        }
+        .tab .material-icons { font-size: 18px; }
+        .statement-section {
+            display: none;
+        }
+        .statement-section.active { display: block; }
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .card-header {
+            background: var(--primary-50);
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--grey-200);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--primary-800);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .card-title .material-icons {
+            font-size: 20px;
+            color: var(--primary-500);
+        }
+        .card-total {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--primary-700);
+        }
+        .card-body { padding: 0; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px 20px;
+            text-align: left;
+            border-bottom: 1px solid var(--grey-200);
+        }
+        th {
+            background: var(--grey-50);
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--grey-600);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        td { font-size: 14px; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover { background: var(--grey-50); }
+        .amount { text-align: right; font-variant-numeric: tabular-nums; }
+        .amount.positive { color: var(--success); }
+        .amount.negative { color: var(--error); }
+        .subtotal {
+            background: var(--primary-50);
+            font-weight: 600;
+        }
+        .subtotal td { color: var(--primary-800); }
+        .grand-total {
+            background: var(--primary-100);
+            font-weight: 700;
+        }
+        .grand-total td {
+            color: var(--primary-900);
+            font-size: 15px;
+        }
+        .row-indent { padding-left: 40px !important; }
+        .row-header {
+            font-weight: 600;
+            color: var(--primary-700);
+            background: var(--grey-50);
+        }
+        .transaction-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .tx-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--grey-200);
+        }
+        .tx-item:hover { background: var(--grey-50); }
+        .tx-info { display: flex; align-items: center; gap: 12px; }
+        .tx-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .tx-icon.income { background: #E8F5E9; color: var(--success); }
+        .tx-icon.expense { background: #FFEBEE; color: var(--error); }
+        .tx-details .tx-title { font-weight: 500; font-size: 14px; }
+        .tx-details .tx-date { font-size: 12px; color: var(--grey-600); }
+        .tx-amount { font-weight: 600; font-size: 15px; }
+        .tx-amount.income { color: var(--success); }
+        .tx-amount.expense { color: var(--error); }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--grey-600);
+        }
+        .empty-state .material-icons {
+            font-size: 64px;
+            color: var(--grey-300);
+            margin-bottom: 16px;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: var(--primary-500);
+            color: white;
+        }
+        .btn-primary:hover { background: var(--primary-600); }
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--primary-500);
+            color: var(--primary-500);
+        }
+        .btn-outline:hover { background: var(--primary-50); }
+        .actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            padding: 16px 20px;
+            background: var(--grey-50);
+            border-top: 1px solid var(--grey-200);
+        }
+        @media (max-width: 768px) {
+            .container { padding: 16px; }
+            .summary-cards { grid-template-columns: repeat(2, 1fr); }
+            .tabs { flex-wrap: wrap; }
+            .tab { flex: 1 1 45%; }
+            th, td { padding: 10px 12px; font-size: 13px; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <span class="material-icons">account_balance</span>
+                <span>GOPANG 재무제표</span>
+            </div>
+            <div class="user-info">
+                <span class="user-badge" id="userBadge">서귀포시 중문동</span>
+                <span id="userName">중문동농업1호</span>
+                <span class="material-icons">account_circle</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="summary-cards">
+            <div class="summary-card">
+                <div class="label">총 자산</div>
+                <div class="value" id="totalAssets">₩8,000</div>
+                <div class="change up"><span class="material-icons">trending_up</span> +5.2%</div>
+            </div>
+            <div class="summary-card">
+                <div class="label">총 부채</div>
+                <div class="value" id="totalLiabilities">₩0</div>
+                <div class="change"><span class="material-icons">trending_flat</span> 0%</div>
+            </div>
+            <div class="summary-card positive">
+                <div class="label">자기자본</div>
+                <div class="value" id="totalEquity">₩8,000</div>
+                <div class="change up"><span class="material-icons">trending_up</span> +5.2%</div>
+            </div>
+            <div class="summary-card">
+                <div class="label">당기순이익</div>
+                <div class="value" id="netIncome">₩0</div>
+                <div class="change"><span class="material-icons">trending_flat</span> -</div>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" data-tab="balance">
+                <span class="material-icons">account_balance_wallet</span>
+                재무상태표
+            </button>
+            <button class="tab" data-tab="income">
+                <span class="material-icons">show_chart</span>
+                손익계산서
+            </button>
+            <button class="tab" data-tab="cashflow">
+                <span class="material-icons">payments</span>
+                현금흐름표
+            </button>
+            <button class="tab" data-tab="transactions">
+                <span class="material-icons">receipt_long</span>
+                거래내역
+            </button>
+        </div>
+
+        <!-- 재무상태표 -->
+        <div class="statement-section active" id="balance">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span class="material-icons">savings</span>
+                        자산 (Assets)
+                    </div>
+                    <div class="card-total" id="assetTotal">₩8,000</div>
+                </div>
+                <div class="card-body">
+                    <table>
+                        <thead>
+                            <tr><th>계정과목</th><th class="amount">금액 (₩)</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr class="row-header"><td colspan="2">유동자산</td></tr>
+                            <tr><td class="row-indent">현금및현금성자산</td><td class="amount" id="cash">5,000</td></tr>
+                            <tr><td class="row-indent">매출채권</td><td class="amount" id="receivables">0</td></tr>
+                            <tr><td class="row-indent">재고자산</td><td class="amount" id="inventory">1,000</td></tr>
+                            <tr class="subtotal"><td>유동자산 소계</td><td class="amount" id="currentAssets">6,000</td></tr>
+                            <tr class="row-header"><td colspan="2">비유동자산</td></tr>
+                            <tr><td class="row-indent">유형자산</td><td class="amount" id="equipment">2,000</td></tr>
+                            <tr><td class="row-indent">무형자산</td><td class="amount" id="intangible">0</td></tr>
+                            <tr class="subtotal"><td>비유동자산 소계</td><td class="amount" id="nonCurrentAssets">2,000</td></tr>
+                            <tr class="grand-total"><td>자산총계</td><td class="amount" id="totalAssetsTable">8,000</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span class="material-icons">credit_card</span>
+                        부채 (Liabilities)
+                    </div>
+                    <div class="card-total" id="liabilityTotal">₩0</div>
+                </div>
+                <div class="card-body">
+                    <table>
+                        <thead>
+                            <tr><th>계정과목</th><th class="amount">금액 (₩)</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr class="row-header"><td colspan="2">유동부채</td></tr>
+                            <tr><td class="row-indent">매입채무</td><td class="amount" id="payables">0</td></tr>
+                            <tr><td class="row-indent">단기차입금</td><td class="amount" id="shortDebt">0</td></tr>
+                            <tr class="subtotal"><td>유동부채 소계</td><td class="amount" id="currentLiabilities">0</td></tr>
+                            <tr class="row-header"><td colspan="2">비유동부채</td></tr>
+                            <tr><td class="row-indent">장기차입금</td><td class="amount" id="longDebt">0</td></tr>
+                            <tr class="subtotal"><td>비유동부채 소계</td><td class="amount" id="nonCurrentLiabilities">0</td></tr>
+                            <tr class="grand-total"><td>부채총계</td><td class="amount" id="totalLiabilitiesTable">0</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span class="material-icons">diamond</span>
+                        자본 (Equity)
+                    </div>
+                    <div class="card-total" id="equityTotal">₩8,000</div>
+                </div>
+                <div class="card-body">
+                    <table>
+                        <thead>
+                            <tr><th>계정과목</th><th class="amount">금액 (₩)</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>자본금</td><td class="amount" id="capital">7,000</td></tr>
+                            <tr><td>이익잉여금</td><td class="amount" id="retained">1,000</td></tr>
+                            <tr class="grand-total"><td>자본총계</td><td class="amount" id="totalEquityTable">8,000</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="actions">
+                    <button class="btn btn-outline"><span class="material-icons">download</span> PDF 다운로드</button>
+                    <button class="btn btn-primary"><span class="material-icons">print</span> 인쇄</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 손익계산서 -->
+        <div class="statement-section" id="income">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span class="material-icons">trending_up</span>
+                        손익계산서
+                    </div>
+                    <div class="card-total">2026년 1월</div>
+                </div>
+                <div class="card-body">
+                    <table>
+                        <thead>
+                            <tr><th>계정과목</th><th class="amount">금액 (₩)</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr class="row-header"><td colspan="2">수익</td></tr>
+                            <tr><td class="row-indent">매출액</td><td class="amount positive" id="sales">0</td></tr>
+                            <tr><td class="row-indent">용역수익</td><td class="amount positive" id="serviceRevenue">0</td></tr>
+                            <tr class="subtotal"><td>수익 합계</td><td class="amount" id="totalRevenue">0</td></tr>
+                            <tr class="row-header"><td colspan="2">비용</td></tr>
+                            <tr><td class="row-indent">매출원가</td><td class="amount negative" id="cogs">0</td></tr>
+                            <tr><td class="row-indent">판매비와관리비</td><td class="amount negative" id="sga">0</td></tr>
+                            <tr class="subtotal"><td>비용 합계</td><td class="amount" id="totalExpenses">0</td></tr>
+                            <tr class="row-header"><td colspan="2">영업이익</td></tr>
+                            <tr class="subtotal"><td>영업이익</td><td class="amount" id="operatingIncome">0</td></tr>
+                            <tr class="row-header"><td colspan="2">영업외손익</td></tr>
+                            <tr><td class="row-indent">이자수익</td><td class="amount positive" id="interestIncome">0</td></tr>
+                            <tr><td class="row-indent">이자비용</td><td class="amount negative" id="interestExpense">0</td></tr>
+                            <tr class="grand-total"><td>당기순이익</td><td class="amount" id="netIncomeTable">0</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="actions">
+                    <button class="btn btn-outline"><span class="material-icons">download</span> PDF 다운로드</button>
+                    <button class="btn btn-primary"><span class="material-icons">print</span> 인쇄</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 현금흐름표 -->
+        <div class="statement-section" id="cashflow">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span class="material-icons">sync_alt</span>
+                        현금흐름표
+                    </div>
+                    <div class="card-total">2026년 1월</div>
+                </div>
+                <div class="card-body">
+                    <table>
+                        <thead>
+                            <tr><th>구분</th><th class="amount">금액 (₩)</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr class="row-header"><td colspan="2">영업활동 현금흐름</td></tr>
+                            <tr><td class="row-indent">당기순이익</td><td class="amount" id="cfNetIncome">0</td></tr>
+                            <tr><td class="row-indent">감가상각비</td><td class="amount">0</td></tr>
+                            <tr><td class="row-indent">매출채권 증감</td><td class="amount">0</td></tr>
+                            <tr><td class="row-indent">재고자산 증감</td><td class="amount">0</td></tr>
+                            <tr><td class="row-indent">매입채무 증감</td><td class="amount">0</td></tr>
+                            <tr class="subtotal"><td>영업활동 현금흐름</td><td class="amount" id="operatingCF">0</td></tr>
+                            <tr class="row-header"><td colspan="2">투자활동 현금흐름</td></tr>
+                            <tr><td class="row-indent">유형자산 취득</td><td class="amount negative">0</td></tr>
+                            <tr><td class="row-indent">유형자산 처분</td><td class="amount positive">0</td></tr>
+                            <tr class="subtotal"><td>투자활동 현금흐름</td><td class="amount" id="investingCF">0</td></tr>
+                            <tr class="row-header"><td colspan="2">재무활동 현금흐름</td></tr>
+                            <tr><td class="row-indent">차입금 증가</td><td class="amount positive">0</td></tr>
+                            <tr><td class="row-indent">차입금 상환</td><td class="amount negative">0</td></tr>
+                            <tr class="subtotal"><td>재무활동 현금흐름</td><td class="amount" id="financingCF">0</td></tr>
+                            <tr class="grand-total"><td>현금 순증감</td><td class="amount" id="netCashChange">0</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="actions">
+                    <button class="btn btn-outline"><span class="material-icons">download</span> PDF 다운로드</button>
+                    <button class="btn btn-primary"><span class="material-icons">print</span> 인쇄</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 거래내역 -->
+        <div class="statement-section" id="transactions">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span class="material-icons">receipt_long</span>
+                        최근 거래내역
+                    </div>
+                </div>
+                <div class="card-body transaction-list" id="txList">
+                    <div class="empty-state">
+                        <span class="material-icons">inbox</span>
+                        <p>거래 내역이 없습니다</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.statement-section').forEach(s => s.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab).classList.add('active');
+            });
+        });
+
+        // Format currency
+        function formatCurrency(num) {
+            return new Intl.NumberFormat('ko-KR').format(num);
+        }
+
+        // Load user data
+        async function loadUserData(userId) {
+            try {
+                const response = await fetch('/data/users-registry.json');
+                const data = await response.json();
+                const user = data.users.find(u => u.userId === userId || u.loginId === userId);
+                if (user) {
+                    updateUI(user);
+                }
+            } catch (error) {
+                console.error('Failed to load user data:', error);
+            }
+        }
+
+        function updateUI(user) {
+            document.getElementById('userName').textContent = user.business.corpName;
+            document.getElementById('userBadge').textContent = `${user.location.city.split('-').pop()} ${user.location.districtName}`;
+            
+            const fs = user.financialStatement;
+            if (fs) {
+                // Balance Sheet
+                document.getElementById('cash').textContent = formatCurrency(fs.balanceSheet.assets.current.cash);
+                document.getElementById('inventory').textContent = formatCurrency(fs.balanceSheet.assets.current.inventory);
+                document.getElementById('equipment').textContent = formatCurrency(fs.balanceSheet.assets.nonCurrent.equipment);
+                
+                const currentAssets = fs.balanceSheet.assets.current.cash + fs.balanceSheet.assets.current.inventory;
+                const nonCurrentAssets = fs.balanceSheet.assets.nonCurrent.equipment;
+                const totalAssets = currentAssets + nonCurrentAssets;
+                
+                document.getElementById('currentAssets').textContent = formatCurrency(currentAssets);
+                document.getElementById('nonCurrentAssets').textContent = formatCurrency(nonCurrentAssets);
+                document.getElementById('totalAssetsTable').textContent = formatCurrency(totalAssets);
+                document.getElementById('totalAssets').textContent = '₩' + formatCurrency(totalAssets);
+                document.getElementById('assetTotal').textContent = '₩' + formatCurrency(totalAssets);
+                
+                const totalEquity = fs.balanceSheet.equity.capital + fs.balanceSheet.equity.retainedEarnings;
+                document.getElementById('capital').textContent = formatCurrency(fs.balanceSheet.equity.capital);
+                document.getElementById('retained').textContent = formatCurrency(fs.balanceSheet.equity.retainedEarnings);
+                document.getElementById('totalEquityTable').textContent = formatCurrency(totalEquity);
+                document.getElementById('totalEquity').textContent = '₩' + formatCurrency(totalEquity);
+                document.getElementById('equityTotal').textContent = '₩' + formatCurrency(totalEquity);
+            }
+        }
+
+        // Load sample user on page load
+        loadUserData('SGP-JM-01');
+    </script>
+</body>
+</html>

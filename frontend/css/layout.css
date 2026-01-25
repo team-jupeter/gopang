@@ -1,0 +1,127 @@
+/* App Container */
+.app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    max-width: 480px;
+    margin: 0 auto;
+    background: #FFFFFF;
+    position: relative;
+    box-shadow: 0 0 20px rgba(0,0,0,0.1);
+}
+
+/* Header */
+.header {
+    display: flex;
+    align-items: center;
+    padding: calc(12px + var(--safe-top)) 16px 12px;
+    background: #1976D2;
+    color: white;
+}
+.header-title {
+    flex: 1;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+}
+.header-balance {
+    font-size: 13px;
+    background: rgba(255,255,255,0.2);
+    padding: 6px 14px;
+    border-radius: 16px;
+    margin-right: 8px;
+    font-weight: 500;
+}
+.header-actions {
+    display: flex;
+    gap: 4px;
+}
+.header-btn {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    color: white;
+    transition: background 0.2s;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+}
+.header-btn:hover {
+    background: rgba(255,255,255,0.15);
+}
+.header-btn.ai-btn {
+    background: rgba(255,255,255,0.2);
+    margin-left: 4px;
+}
+.header-btn .material-icons {
+    font-size: 24px;
+}
+
+/* Main Screen */
+.main-screen {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* Chat Screen */
+.chat-screen {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* Bottom Navigation */
+.bottom-nav {
+    display: flex;
+    background: #FFFFFF;
+    border-top: 1px solid #E0E0E0;
+    padding-bottom: var(--safe-bottom);
+}
+.nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 8px;
+    color: #757575;
+    transition: color 0.2s;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+}
+.nav-item.active {
+    color: #1976D2;
+}
+.nav-item .material-icons {
+    font-size: 24px;
+    margin-bottom: 2px;
+}
+.nav-item span:last-child {
+    font-size: 11px;
+    font-weight: 500;
+}
+
+/* Status Bar */
+.status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px calc(8px + var(--safe-bottom));
+    background: #263238;
+    color: rgba(255,255,255,0.9);
+    font-size: 11px;
+}
+
+/* Loading */
+.loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    color: #9E9E9E;
+    font-size: 14px;
+}
