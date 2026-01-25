@@ -137,7 +137,7 @@ flowchart LR
 
 GOPANG은 **2개의 AI 모델**을 역할에 따라 분리 운영합니다.
 
-### DeepSeek R1 API (상담/분석)
+### 외부 거대 LLM(ChatGPT, Gemini, Claude, DeepSeek R1 등) API (상담/분석)
 
 | 항목 | 내용 |
 |------|------|
