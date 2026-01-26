@@ -20,21 +20,19 @@
 | K. 프론트엔드 | 8 | 8 | 100% |
 | **총계** | **64** | **64** | **100%** |
 
-## 패치 적용 내역
+## 관련 레포지토리
 
-OpenHash 노드 (recovery-temp: 3.231.220.126)에 다음 엔드포인트 추가:
-
-- `POST /transaction/validate` - 5단계 거래 검증
-- `POST /transaction/anomaly` - 이상 탐지
-- `GET /transaction/verify/:txHash` - 거래 해시 검증
-- `POST /verify/downstream` - 하향식 계층 검증
-- `POST /verify/all` - 전체 계층 검증
+- **gopang**: https://github.com/team-jupeter/gopang (프론트엔드/백엔드)
+- **openhash-node**: https://github.com/team-jupeter/openhash-node (OpenHash 4계층 노드)
 
 ## 서버 정보
 
-- **gopang-dev**: 13.222.8.230 (프론트엔드, 백엔드)
-- **recovery-temp**: 3.231.220.126 (OpenHash 4계층 노드)
-- **도메인**: https://gopang.net
+| 서버 | IP | 용도 |
+|------|-----|------|
+| gopang-dev | 13.222.8.230 | 프론트엔드, 백엔드 |
+| recovery-temp | 3.231.220.126 | OpenHash 노드 (Port 5001-5004) |
+
+**도메인**: https://gopang.net
 
 ---
 *테스트 완료: 2026-01-26 05:04 KST*
